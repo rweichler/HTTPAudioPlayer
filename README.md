@@ -1,31 +1,33 @@
 HTTPAudioStreamer
 ========
 
-My implementation of an Audio Streamer over HTTP. Uses AVFoundation's AVAudioPlayer and my own simple HTTPFileSaver to accomplish this.
+This should actually be titled HTTPAudioPlayer. D:
+
+My implementation of an Audio player over HTTP. Uses AVFoundation's AVAudioPlayer and my own simple HTTPFileSaver to accomplish this.
 
 # How to use
 
 ```objc
-//initialize the streamer
+//initialize the player
 NSURL *httpURL = [NSURL URLWithString:@"http://example.com/somefile.mp3"];
-HTTPAudioStreamer *streamer = [[HTTPAudioStreamer alloc] initWithURL:httpURL];
-streamer.delegate = someDelegate;
+HTTPAudioPlayer *player = [[HTTPAudioPlayer alloc] initWithURL:httpURL];
+player.delegate = someDelegate;
 
 //set the URL to save it to in a few ways
 NSURL *someURL;
-streamer.fileSaver.localURL = someURL;
-streamer.fileSaver.documentsPath = @"test.mp3"; //localURL = ~mobile/Applicaitons/APP-FOLDER/Documents/XXX
+player.fileSaver.localURL = someURL;
+player.fileSaver.documentsPath = @"test.mp3"; //localURL = ~mobile/Applicaitons/APP-FOLDER/Documents/XXX
 
 //download and play!
-[streamer download];
-[streamer play];
+[player download];
+[player play];
 
 //use these to pause and stop
-[streamer pause];
-[streamer stop];
+[player pause];
+[player stop];
 
 //otherwise go ahead and call them on the AVAudioPlayer itself
-streamer.audioPlayer.volume = 0.5;
+player.audioPlayer.volume = 0.5;
 
 ```
 
@@ -47,12 +49,12 @@ streamer.audioPlayer.volume = 0.5;
 You can also use methods on HTTPAudioPlayer's HTTPFileSaver to manipulate the download. For example:
 
 ```objc
-HTTPAudioStreamer *streamer;
+HTTPAudioPlayer *player;
 
-if(secondsSinceLastPacketRecieved > 20 && streamer.fileSaver.downloading)
+if(secondsSinceLastPacketRecieved > 20 && player.fileSaver.downloading)
 {
     //cancels download and deletes local file
-    [streamer.fileSaver deleteLocalFile];
+    [player.fileSaver deleteLocalFile];
 }
 
 ```
