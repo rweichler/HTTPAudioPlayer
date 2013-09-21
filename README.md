@@ -1,9 +1,7 @@
-HTTPAudioStreamer
+HTTPAudioPlayer
 ========
 
-This should actually be titled HTTPAudioPlayer. D:
-
-My implementation of an Audio player over HTTP. Uses AVFoundation's AVAudioPlayer and my own simple HTTPFileSaver to accomplish this.
+My implementation of an Audio streamer/player over HTTP. Uses AVFoundation's AVAudioPlayer and my own simple HTTPFileSaver to accomplish this.
 
 # How to use
 
