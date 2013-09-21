@@ -27,6 +27,9 @@
     BOOL _justStartedDownload;
     
     NSTimer *_bufferTimer;
+    
+    BOOL _songEndedStillBuffering;
+    NSTimeInterval _lastCurrentTime;
 }
 -(void)startBufferTimer;
 -(void)stopBufferTimer;
@@ -96,8 +99,14 @@
 
 -(BOOL)canPlay
 {
+    NSTimeInterval currentTime;
+    if(_songEndedStillBuffering)
+        currentTime = _lastCurrentTime;
+    else
+        currentTime = self.currentTime;
+    
     //can only play if there's HTTPAUDIOPLAYER_BUFFER_TIME seconds of audio available or if finished downloading
-    return !_justStartedDownload && _fileSaver.expectedSize != 0 && _audioPlayer != nil && (_fileSaver.downloaded || self.availableDuration - self.currentTime > HTTPAUDIOPLAYER_BUFFER_TIME);
+    return !_justStartedDownload && _fileSaver.expectedSize != 0 && _audioPlayer != nil && (_fileSaver.downloaded || self.availableDuration - currentTime > HTTPAUDIOPLAYER_BUFFER_TIME);
 }
 
 -(BOOL)download
@@ -152,11 +161,27 @@
 
 -(void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag
 {
-    _buffering = false;
-    [self stopBufferTimer];
-    if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidFinishPlaying:)])
+    if(!_fileSaver.downloaded)
     {
-        [self.delegate audioPlayerDidFinishPlaying:self];
+        _buffering = true;
+        _songEndedStillBuffering = true;
+        _lastCurrentTime = player.currentTime;
+        _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:_fileSaver.localURL error:nil];
+        _audioPlayer.delegate = self;
+        [_audioPlayer prepareToPlay];
+        if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidStartBuffering:)])
+        {
+            [self.delegate audioPlayerDidStartBuffering:self];
+        }
+    }
+    else
+    {
+        _buffering = false;
+        [self stopBufferTimer];
+        if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidFinishPlaying:)])
+        {
+            [self.delegate audioPlayerDidFinishPlaying:self];
+        }
     }
 }
 
@@ -204,6 +229,12 @@
         {
             [self.delegate audioPlayerDidStartBuffering:self];
         }
+    }
+    else if(_buffering && _songEndedStillBuffering && self.canPlay)
+    {
+        _songEndedStillBuffering = false;
+        _audioPlayer.currentTime = _lastCurrentTime;
+        [_audioPlayer play];
     }
     
 }

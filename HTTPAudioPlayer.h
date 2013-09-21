@@ -23,7 +23,7 @@
 #import "HTTPFileSaver.h"
 #import <AVFoundation/AVFoundation.h>
 
-#define HTTPAUDIOPLAYER_BUFFER_TIME 2 //start buffering if there is less than these many seconds downloaded past
+#define HTTPAUDIOPLAYER_BUFFER_TIME 5 //start buffering if there is less than these many seconds downloaded past
 
 @class HTTPAudioPlayer;
 @protocol HTTPAudioPlayerDelegate <NSObject>
