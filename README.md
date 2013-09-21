@@ -62,3 +62,9 @@ There's other stuff you can do, too. Take a look at the header files.
 # License
 
 This uses an MIT license. You can read it at the stop of the source code of any of the files.
+
+# What this is compatible with
+
+The only thing I've tested this on is on a jailbroken iOS 6.0 using the iOS 7.0 SDK (built for iOS5+). So it should be compatible with iOS 5+.
+
+Also, I'm like 99% sure this won't work on simulator. Only on the device.
