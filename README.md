@@ -3,6 +3,8 @@ HTTPAudioPlayer
 
 My implementation of an Audio streamer/player over HTTP. Uses AVFoundation's AVAudioPlayer and my own simple HTTPFileSaver to accomplish this.
 
+It basically is an AVPlayer with a couple of nifty features, including the ability to download the data before you play it and delegate methods for buffering.
+
 # How to use
 
 ```objc
