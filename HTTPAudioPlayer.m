@@ -114,7 +114,7 @@
     if(_justStartedDownload) return false;
     
     BOOL success = [_fileSaver start];
-    
+
     if(success) _justStartedDownload = true;
     
     return success;
@@ -122,7 +122,9 @@
 
 -(void)play
 {
-    if(self.canPlay && !_audioPlayer.playing)
+    if(_audioPlayer.playing) return;
+    
+    if(self.canPlay)
     {
         _buffering = false;
         BOOL success = [_audioPlayer play];
