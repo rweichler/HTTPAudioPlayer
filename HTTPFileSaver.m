@@ -140,16 +140,16 @@
     if(!appendLooping)
     {
         appendLooping = true;
+        NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:_localURL.path];
         while(dataAppendArray.count > 0 && !_cancelled)
         {
             NSData *data = dataAppendArray[0];
             _actualSize += data.length;
-            NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:_localURL.path];
             [fileHandle seekToEndOfFile];
             [fileHandle writeData:data];
-            [fileHandle closeFile];
             [dataAppendArray removeObjectAtIndex:0];
         }
+        [fileHandle closeFile];
         appendLooping = false;
     }
     
