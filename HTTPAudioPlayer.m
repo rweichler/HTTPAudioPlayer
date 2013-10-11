@@ -50,9 +50,18 @@
     return self;
 }
 
+-(id)initWithURLs:(NSArray *)URLs
+{
+    if(self == [super init])
+    {
+        _fileSaver = [[HTTPFileSaver alloc] initWithHTTPURLs:URLs localURL:nil delegate:self];
+    }
+    return self;
+}
+
 -(void)fileSaverGotData:(HTTPFileSaver *)saver
 {
-    if((_justStartedDownload || _audioPlayer == nil) && saver.actualSize > 50000)
+    if((_justStartedDownload || _audioPlayer == nil) && (saver.actualSize > 100000 || saver.downloaded))
     {
         _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:_fileSaver.localURL error:nil];
         _audioPlayer.delegate = self;
@@ -165,6 +174,7 @@
 {
     if(!_fileSaver.downloaded)
     {
+        NSLog(@"hit end");
         _buffering = true;
         _songEndedStillBuffering = true;
         _lastCurrentTime = player.currentTime;

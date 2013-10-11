@@ -33,6 +33,8 @@
 
 @interface HTTPFileSaver : NSObject<NSURLConnectionDelegate>
 
+-(id)initWithHTTPURLs:(NSArray *)HTTPURLs localURL:(NSURL *)localURL delegate:(NSObject<HTTPFileSaverDelegate> *)delegate;
+
 -(id)initWithHTTPURL:(NSURL *)HTTPURL localURL:(NSURL *)localURL;
 -(id)initWithHTTPURL:(NSURL *)HTTPURL localURL:(NSURL *)localURL delegate:(NSObject<HTTPFileSaverDelegate> *)delegate;
 
@@ -43,6 +45,7 @@
 -(id)initWithHTTPPath:(NSString *)HTTPPath documentsPath:(NSString *)documentsPath delegate:(NSObject<HTTPFileSaverDelegate> *)delegate;
 
 @property (nonatomic, strong) NSURL *HTTPURL;
+@property (nonatomic, strong) NSArray *HTTPURLs;
 @property (nonatomic, strong) NSURL *localURL;
 -(void)setDocumentsPath:(NSString *)documentsPath; //localURL = ~mobile/Applicaitons/APP-FOLDER/Documents/XXX
 

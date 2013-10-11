@@ -42,6 +42,7 @@
 @interface HTTPAudioPlayer : NSObject<HTTPFileSaverDelegate, AVAudioPlayerDelegate>
 
 -(id)initWithURL:(NSURL *)URL;
+-(id)initWithURLs:(NSArray *)URLs;
 
 @property (nonatomic, strong) HTTPFileSaver *fileSaver;
 @property (nonatomic, strong) AVAudioPlayer *audioPlayer;

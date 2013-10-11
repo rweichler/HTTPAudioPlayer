@@ -35,7 +35,21 @@
 @end
 
 @implementation HTTPFileSaver
-@synthesize HTTPURL=_HTTPURL, localURL=_localURL, delegate=_delegate, actualSize=_actualSize, expectedSize=_expectedSize, downloading=_downloading;
+@synthesize HTTPURL=_HTTPURL, localURL=_localURL, delegate=_delegate, actualSize=_actualSize, expectedSize=_expectedSize, downloading=_downloading, HTTPURLs=_HTTPURLs;
+
+-(id)initWithHTTPURLs:(NSArray *)HTTPURLs localURL:(NSURL *)localURL delegate:(NSObject<HTTPFileSaverDelegate> *)delegate
+{
+    if(self == [super init])
+    {
+        assert(HTTPURLs.count > 0);
+        
+        _HTTPURLs = HTTPURLs;
+        _localURL = localURL;
+        _delegate = delegate;
+        _HTTPURL = HTTPURLs[0];
+    }
+    return self;
+}
 
 -(id)initWithHTTPURL:(NSURL *)HTTPURL localURL:(NSURL *)localURL delegate:(NSObject<HTTPFileSaverDelegate> *)delegate
 {
@@ -81,7 +95,12 @@
 
 -(BOOL)start
 {
-    if(_HTTPURL == nil || _localURL == nil || self.downloading || self.downloaded) return false;
+    return [self startIsInitial:true];
+}
+
+-(BOOL)startIsInitial:(BOOL)initial
+{
+    if(_HTTPURL == nil || _localURL == nil || (initial && (self.downloading || self.downloaded))) return false;
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:_HTTPURL];
     _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
@@ -119,10 +138,13 @@
 
 -(void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
 {
-    _downloading = true;
-    [[NSData data] writeToFile:_localURL.path options:NSDataWritingAtomic error:nil];
-    dataAppendArray = @[].mutableCopy;
-    _expectedSize = response.expectedContentLength;
+    if(!_downloading)
+    {
+        [[NSData data] writeToFile:_localURL.path options:NSDataWritingAtomic error:nil];
+        dataAppendArray = @[].mutableCopy;
+        _downloading = true;
+    }
+    _expectedSize += (int)response.expectedContentLength;
     [self callDelegateSelector:@selector(fileSaverStarted:)];
 }
 
@@ -173,7 +195,7 @@
 
 -(BOOL)downloaded
 {
-    return self.expectedSize != 0 && self.expectedSize == self.actualSize;
+    return self.expectedSize != 0 && self.expectedSize == self.actualSize && (_HTTPURLs == nil || [_HTTPURLs indexOfObject:_HTTPURL] == NSNotFound || [_HTTPURLs indexOfObject:_HTTPURL] == _HTTPURLs.count - 1);
 }
 
 -(void)setDocumentsPath:(NSString *)documentsPath
@@ -189,6 +211,22 @@
 
 -(void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
+    if(_HTTPURLs != nil)
+    {
+        NSLog(@"finished section");
+        NSUInteger index = [_HTTPURLs indexOfObject:_HTTPURL];
+        if(index != NSNotFound && index < _HTTPURLs.count - 1)
+        {
+            _HTTPURL = _HTTPURLs[index+1];
+            [self startIsInitial:false];
+            return;
+        }
+        else if(index == _HTTPURLs.count - 1)
+        {
+            _HTTPURLs = nil;
+        }
+    }
+    NSLog(@"finished download");
     _downloading = false;
     [self callDelegateSelector:@selector(fileSaverCompleted:)];
 }
