@@ -29,6 +29,10 @@
     
     NSURLConnection *_connection;
     BOOL _cancelled;
+    
+    int _currentFileSize;
+    
+    NSDictionary *_currentURLDict;
 }
 -(void)callDelegateSelector:(SEL)selector;
 
@@ -43,10 +47,10 @@
     {
         assert(HTTPURLs.count > 0);
         
-        _HTTPURLs = HTTPURLs;
+        self.HTTPURLs = HTTPURLs;
         _localURL = localURL;
         _delegate = delegate;
-        _HTTPURL = HTTPURLs[0];
+        
     }
     return self;
 }
@@ -96,6 +100,28 @@
 -(BOOL)start
 {
     return [self startIsInitial:true];
+}
+
+-(void)setHTTPURLs:(NSArray *)HTTPURLs
+{
+    _HTTPURLs = HTTPURLs;
+    
+    if(_HTTPURLs == nil) return;
+    
+    id url;
+    if([HTTPURLs[0] isKindOfClass:NSDictionary.class])
+    {
+        _currentURLDict = HTTPURLs[0];
+        url = _currentURLDict[@"url"];
+    }
+    else
+    {
+        url = HTTPURLs[0];
+    }
+    if([url isKindOfClass:NSURL.class])
+        _HTTPURL = url;
+    else if([url isKindOfClass:NSString.class])
+        _HTTPURL = [NSURL URLWithString:url];
 }
 
 -(BOOL)startIsInitial:(BOOL)initial
@@ -150,8 +176,57 @@
 
 -(void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
 {
+    int len = (int)data.length;
+    
+    if(_HTTPURLs != nil && _currentURLDict != nil && (_currentURLDict[@"start"] || _currentURLDict[@"end"]))
+    {
+        int start = [_currentURLDict[@"start"] intValue];
+        int end = [_currentURLDict[@"end"] intValue];
+        
+        int dataStart = 0;
+        
+        if(start != 0 && _currentFileSize < start)
+        {
+            dataStart = start - _currentFileSize;
+            //NSLog(@"changing start");
+        }
+        
+        int dataLen;
+        
+        if(end != 0 && _currentFileSize + len > end && _currentFileSize < end)
+        {
+            dataLen = end - _currentFileSize - dataStart;
+            //NSLog(@"changing end");
+        }
+        else
+        {
+            dataLen = len - dataStart;
+        }
+        if(dataLen < 0) dataLen = 0;
+        
+        //NSLog(@"%d-%d", dataStart, dataLen);
+        
+        if(!(dataStart == 0 && dataLen == len))
+        {
+            if(dataLen == 0)
+            {
+                data = nil;
+            }
+            else
+            {
+                NSRange range = {dataStart, dataLen};
+                data = [data subdataWithRange:range];
+            }
+        }
+        _expectedSize -= len - dataLen;
+    }
+    
+    //NSLog(@"recieved data");
+    
+    _currentFileSize += len;
     //[webData appendData:data];
-    [dataAppendArray addObject:data];
+    if(data != nil)
+        [dataAppendArray addObject:data];
     [self appendLoop];
     
     [self callDelegateSelector:@selector(fileSaverGotData:)];
@@ -195,7 +270,9 @@
 
 -(BOOL)downloaded
 {
-    return self.expectedSize != 0 && self.expectedSize == self.actualSize && (_HTTPURLs == nil || [_HTTPURLs indexOfObject:_HTTPURL] == NSNotFound || [_HTTPURLs indexOfObject:_HTTPURL] == _HTTPURLs.count - 1);
+    id obj = _currentURLDict;
+    if(obj == nil) obj = _HTTPURL;
+    return self.expectedSize != 0 && self.expectedSize == self.actualSize && (_HTTPURLs == nil || [_HTTPURLs indexOfObject:obj] == NSNotFound || [_HTTPURLs indexOfObject:obj] == _HTTPURLs.count - 1);
 }
 
 -(void)setDocumentsPath:(NSString *)documentsPath
@@ -211,13 +288,35 @@
 
 -(void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
+    _currentFileSize = 0;
     if(_HTTPURLs != nil)
     {
         NSLog(@"finished section");
-        NSUInteger index = [_HTTPURLs indexOfObject:_HTTPURL];
+        id obj;
+        if(_currentURLDict != nil)
+            obj = _currentURLDict;
+        else
+            obj = _HTTPURL;
+        NSUInteger index = [_HTTPURLs indexOfObject:obj];
         if(index != NSNotFound && index < _HTTPURLs.count - 1)
         {
-            _HTTPURL = _HTTPURLs[index+1];
+            index = index + 1;
+            
+            id url;
+            if([_HTTPURLs[index] isKindOfClass:NSDictionary.class])
+            {
+                _currentURLDict = _HTTPURLs[index];
+                url = _currentURLDict[@"url"];
+            }
+            else
+            {
+                url = _HTTPURLs[index];
+            }
+            if([url isKindOfClass:NSURL.class])
+                _HTTPURL = url;
+            else if([url isKindOfClass:NSString.class])
+                _HTTPURL = [NSURL URLWithString:url];
+            
             [self startIsInitial:false];
             return;
         }

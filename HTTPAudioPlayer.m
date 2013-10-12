@@ -61,8 +61,9 @@
 
 -(void)fileSaverGotData:(HTTPFileSaver *)saver
 {
-    if((_justStartedDownload || _audioPlayer == nil) && (saver.actualSize > 100000 || saver.downloaded))
+    if((_justStartedDownload || _audioPlayer == nil) && (saver.actualSize > 80000 || saver.downloaded))
     {
+        NSLog(@"actualSize: %d", saver.actualSize);
         _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:_fileSaver.localURL error:nil];
         _audioPlayer.delegate = self;
         [_audioPlayer prepareToPlay];
