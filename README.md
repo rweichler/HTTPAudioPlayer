@@ -31,6 +31,30 @@ player.audioPlayer.volume = 0.5;
 
 ```
 
+You can also download a multitude of streams and stitch them together:
+
+```objc
+player.HTTPURLs = @[
+    @"http://blah.com/blah1.mp3",
+    @"http://blah.com/blah2.mp3"
+];
+```
+You can also set some attributes, like the beginnings and ends to shave off:
+```objc
+player.HTTPURLs = @[
+    @{
+        @"url": @"http://blah.com/1.mp3",
+        @"start": @1000 // in bytes
+    }, 
+    @{
+        @"url": @"http://blah.com/2.mp3",
+        @"start": @2000,
+        @"end": @1000000
+    },
+    @"http://blah.com/3.mp3"
+];
+```
+
 ## Delegate methods
 
 ```objc
