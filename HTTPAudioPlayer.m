@@ -30,6 +30,8 @@
     
     BOOL _songEndedStillBuffering;
     NSTimeInterval _lastCurrentTime;
+    
+    BOOL _stopped;
 }
 -(void)startBufferTimer;
 -(void)stopBufferTimer;
@@ -63,7 +65,7 @@
 {
     if((_justStartedDownload || _audioPlayer == nil) && (saver.actualSize > 80000 || saver.downloaded))
     {
-        NSLog(@"actualSize: %d", saver.actualSize);
+        //NSLog(@"actualSize: %d", saver.actualSize);
         _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:_fileSaver.localURL error:nil];
         _audioPlayer.delegate = self;
         [_audioPlayer prepareToPlay];
@@ -121,7 +123,7 @@
 
 -(BOOL)download
 {
-    if(_justStartedDownload) return false;
+    if(_justStartedDownload || _fileSaver.downloaded || _fileSaver.downloading) return false;
     
     BOOL success = [_fileSaver start];
 
@@ -136,6 +138,21 @@
     
     if(self.canPlay)
     {
+        if(_stopped)
+        {
+            if(_fileSaver.downloaded)
+            {
+                [_audioPlayer prepareToPlay];
+            }
+            else if(_fileSaver.downloading)
+            {
+                NSLog(@"still downloading, should work.");
+            }
+            else
+            {
+                NSLog(@"stopped download, shouldnt work");
+            }
+        }
         _buffering = false;
         BOOL success = [_audioPlayer play];
         if(!success)
@@ -175,7 +192,6 @@
 {
     if(!_fileSaver.downloaded)
     {
-        NSLog(@"hit end");
         _buffering = true;
         _songEndedStillBuffering = true;
         _lastCurrentTime = player.currentTime;
@@ -213,7 +229,9 @@
 
 -(void)stop
 {
+    [_fileSaver cancel];
     [_audioPlayer stop];
+    _stopped = true;
     _audioPlayer.currentTime = 0;
 }
 

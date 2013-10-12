@@ -132,7 +132,7 @@
     _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
     if (!_connection) return false;
     
-    
+    _cancelled = false;
     [_connection start];
     
     return true;
@@ -322,6 +322,8 @@
         }
         else if(index == _HTTPURLs.count - 1)
         {
+            _HTTPURL = nil;
+            _currentURLDict = nil;
             _HTTPURLs = nil;
         }
     }
