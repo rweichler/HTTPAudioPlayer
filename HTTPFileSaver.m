@@ -168,6 +168,8 @@
     {
         [[NSData data] writeToFile:_localURL.path options:NSDataWritingAtomic error:nil];
         dataAppendArray = @[].mutableCopy;
+        _actualSize = 0;
+        _expectedSize = 0;
         _downloading = true;
     }
     _expectedSize += (int)response.expectedContentLength;

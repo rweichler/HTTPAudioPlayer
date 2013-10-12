@@ -162,6 +162,7 @@
     }
     else
     {
+        NSLog(@"Can't Play");
         _buffering = true;
         if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidStartBuffering:)])
         {
@@ -192,6 +193,7 @@
 {
     if(!_fileSaver.downloaded)
     {
+        NSLog(@"Ended and song isn't downloaded");
         _buffering = true;
         _songEndedStillBuffering = true;
         _lastCurrentTime = player.currentTime;
