@@ -19,6 +19,12 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+//-------------------------------------------------------------------------
+#pragma mark Forward declarations
+//-------------------------------------------------------------------------
+@interface NSString(NSString_Extended)
+-(NSString *)urlencode;
+@end
 
 #import "HTTPFileSaver.h"
 
@@ -31,6 +37,7 @@
     BOOL _cancelled;
     
     int _currentFileSize;
+    int _currentFileSizeBeforeFail;
     
     NSDictionary *_currentURLDict;
 }
@@ -85,7 +92,7 @@
 -(id)initWithHTTPPath:(NSString *)HTTPPath documentsPath:(NSString *)documentsPath delegate:(NSObject<HTTPFileSaverDelegate> *)delegate
 {
     
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = paths[0];
     NSString *path = [documentsDirectory stringByAppendingPathComponent:documentsPath];
     
@@ -129,6 +136,75 @@
     if(_HTTPURL == nil || _localURL == nil || (initial && (self.downloading || self.downloaded))) return false;
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:_HTTPURL];
+    if(self.properties[@"cookies"])
+    {
+        NSDictionary *cookies = self.properties[@"cookies"];
+        //convert cookies into NSHTTPCookies
+        NSMutableArray *cookieJar = @[].mutableCopy;
+        for(id key in cookies)
+        {
+            NSDictionary *properties = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        _HTTPURL, NSHTTPCookieOriginURL,
+                                        key, NSHTTPCookieName,
+                                        [cookies valueForKey:key], NSHTTPCookieValue,
+                                        nil];
+            NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties:properties];
+            if(cookie != nil)
+                [cookieJar addObject:cookie];
+        }
+        //put cookies in header
+        NSDictionary *cookieHeader = [NSHTTPCookie requestHeaderFieldsWithCookies:cookieJar];
+        for(id key in cookieHeader)
+        {
+            [request addValue:cookieHeader[key] forHTTPHeaderField:key];
+        }
+    }
+    if(self.properties[@"headers"])
+    {
+        NSDictionary *headers = self.properties[@"headers"];
+        for(id key in headers)
+        {
+            [request addValue:headers[key] forHTTPHeaderField:key];
+        }
+    }
+    if(self.properties[@"method"])
+    {
+        request.HTTPMethod = [self.properties[@"method"] uppercaseString];
+    }
+    if(self.properties[@"params"])
+    {
+        NSDictionary *params = self.properties[@"params"];
+        //add params
+        NSMutableString *body = [NSMutableString string];
+        BOOL setFirst = false;
+        for(NSString *key in params)
+        {
+            if(!setFirst)
+            {
+                setFirst = true;
+            }
+            else
+            {
+                [body appendString:@"&"];
+            }
+            NSString *val = [NSString stringWithFormat:@"%@", params[key]];
+            
+            NSString *tempkey = [NSString stringWithFormat:@"%@", key];
+            
+            [body appendFormat:@"%@%@%@", tempkey.urlencode, @"=", val.urlencode];
+        }
+        if([request.HTTPMethod isEqualToString:@"GET"] || self.properties[@"method"] == nil)
+        {
+            NSString *strURL = [NSString stringWithFormat:@"%@%@%@", _HTTPURL, @"?", body];
+            request.URL = [NSURL URLWithString:strURL];
+        }
+        else
+        {
+            request.HTTPBody = [body dataUsingEncoding:NSUTF8StringEncoding];
+        }
+    }
+    
+    
     _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
     if (!_connection) return false;
     
@@ -179,21 +255,18 @@
 -(void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
 {
     int len = (int)data.length;
+    int dataStart = 0, dataLen = len;
     
     if(_HTTPURLs != nil && _currentURLDict != nil && (_currentURLDict[@"start"] || _currentURLDict[@"end"]))
     {
         int start = [_currentURLDict[@"start"] intValue];
         int end = [_currentURLDict[@"end"] intValue];
         
-        int dataStart = 0;
-        
         if(start != 0 && _currentFileSize < start)
         {
             dataStart = start - _currentFileSize;
             //NSLog(@"changing start");
         }
-        
-        int dataLen;
         
         if(end != 0 && _currentFileSize + len > end && _currentFileSize < end)
         {
@@ -205,28 +278,30 @@
             dataLen = len - dataStart;
         }
         if(dataLen < 0) dataLen = 0;
-        
-        //NSLog(@"%d-%d", dataStart, dataLen);
-        
-        if(!(dataStart == 0 && dataLen == len))
-        {
-            if(dataLen == 0)
-            {
-                data = nil;
-            }
-            else
-            {
-                NSRange range = {dataStart, dataLen};
-                data = [data subdataWithRange:range];
-            }
-        }
-        _expectedSize -= len - dataLen;
     }
     
-    //NSLog(@"recieved data");
+    //if we previously failed the download, then don't redownload it
+    int difference = _currentFileSizeBeforeFail - (_currentFileSize + dataStart);
+    if(difference > 0)
+    {
+        dataLen -= difference;
+        dataStart += difference;
+        if(dataLen < 0) dataLen = 0;
+    }
     
+    if(!(dataStart == 0 && dataLen == len) && dataLen != 0)
+    {
+        NSRange range = {dataStart, dataLen};
+        data = [data subdataWithRange:range];
+    }
+    else if(dataLen == 0)
+    {
+        data = nil;
+    }
+    
+    _expectedSize -= len - dataLen;
     _currentFileSize += len;
-    //[webData appendData:data];
+    
     if(data != nil)
         [dataAppendArray addObject:data];
     [self appendLoop];
@@ -281,7 +356,7 @@
 {
     if(_downloading) return;
     
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = paths[0];
     NSString *path = [documentsDirectory stringByAppendingPathComponent:documentsPath];
     
@@ -291,6 +366,7 @@
 -(void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
     _currentFileSize = 0;
+    _currentFileSizeBeforeFail = 0;
     if(_HTTPURLs != nil)
     {
         NSLog(@"finished section");
@@ -329,14 +405,18 @@
             _HTTPURLs = nil;
         }
     }
-    NSLog(@"finished download");
+    NSLog(@"finished download: %d %d", _actualSize, _expectedSize);
     _downloading = false;
     [self callDelegateSelector:@selector(fileSaverCompleted:)];
 }
 
 -(void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
 {
+    //let delegate know we failed and try again
     [self callDelegateSelector:@selector(fileSaverFailed:)];
+    _currentFileSizeBeforeFail = _currentFileSize;
+    
+    [self startIsInitial:false];
     
 }
 
@@ -349,4 +429,28 @@
 }
 
 
+@end
+//-------------------------------------------------------------------------
+
+@implementation NSString (NSString_Extended)
+
+- (NSString *)urlencode {
+    NSMutableString *output = [NSMutableString string];
+    const unsigned char *source = (const unsigned char *)[self UTF8String];
+    int sourceLen = (int)strlen((const char *)source);
+    for (int i = 0; i < sourceLen; ++i) {
+        const unsigned char thisChar = source[i];
+        if (thisChar == ' '){
+            [output appendString:@"+"];
+        } else if (thisChar == '.' || thisChar == '-' || thisChar == '_' || thisChar == '~' ||
+                   (thisChar >= 'a' && thisChar <= 'z') ||
+                   (thisChar >= 'A' && thisChar <= 'Z') ||
+                   (thisChar >= '0' && thisChar <= '9')) {
+            [output appendFormat:@"%c", thisChar];
+        } else {
+            [output appendFormat:@"%%%02X", thisChar];
+        }
+    }
+    return output;
+}
 @end

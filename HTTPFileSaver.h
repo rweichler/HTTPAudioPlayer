@@ -56,6 +56,8 @@
 
 @property (nonatomic) NSObject<HTTPFileSaverDelegate> *delegate;
 
+@property (nonatomic, strong) NSDictionary *properties;
+
 -(BOOL)start;
 -(BOOL)cancel;
 -(BOOL)deleteLocalFile;

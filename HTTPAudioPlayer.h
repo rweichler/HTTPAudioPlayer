@@ -27,7 +27,7 @@
 
 @class HTTPAudioPlayer;
 @protocol HTTPAudioPlayerDelegate <NSObject>
-
+@optional
 -(void)audioPlayerDidStartBuffering:(HTTPAudioPlayer *)audioPlayer;
 -(BOOL)audioPlayerDidFinishBuffering:(HTTPAudioPlayer *)audioPlayer; //return true to continue playing, return false to not, if not implemented will assume true
 -(void)audioPlayerDidFinishPlaying:(HTTPAudioPlayer *)audioPlayer;
@@ -36,6 +36,7 @@
 //related to file download
 -(void)audioPlayerDidFinishDownloading:(HTTPAudioPlayer *)audioPlayer;
 -(void)audioPlayerDownloadFailed:(HTTPAudioPlayer *)audioPlayer;
+-(void)audioPlayerGotData:(HTTPAudioPlayer *)audioPlayer;
 
 @end
 
@@ -57,6 +58,8 @@
 @property (nonatomic, readonly) NSTimeInterval duration;
 @property (nonatomic, readonly) NSTimeInterval availableDuration; //duration of currently available data
 @property (nonatomic, readonly, getter = isPlaying) BOOL playing;
+
+@property (nonatomic, strong) NSDictionary *properties;
 
 
 -(void)play;

@@ -54,6 +54,22 @@ player.HTTPURLs = @[
     @"http://blah.com/3.mp3"
 ];
 ```
+Setting headers/method/cookies/etc
+```objc
+player.properties = @{
+    @"headers": @{
+        @"Authorization": @"GoogleLogin auth=blah blah"
+    },
+    @"cookies": @{
+        @"Cookie1": @"some value"
+    },
+    @"method": @"POST",
+    @"params": @{
+        @"param1": @"some value",
+        @"param2": @"some other value",
+    }
+};
+```
 
 ## Delegate methods
 

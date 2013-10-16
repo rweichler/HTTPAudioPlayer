@@ -91,6 +91,16 @@
         
         _buffering = false;
     }
+    
+    
+    if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerGotData:)])
+    {
+        [self.delegate audioPlayerGotData:self];
+    }
+}
+-(void)setProperties:(NSDictionary *)properties
+{
+    self.fileSaver.properties = properties;
 }
 
 -(void)fileSaverFailed:(HTTPFileSaver *)saver
