@@ -32,6 +32,9 @@
     NSTimeInterval _lastCurrentTime;
     
     BOOL _stopped;
+#ifdef TARGET_OS_IPHONE
+    int _backgroundTask;
+#endif
 }
 -(void)startBufferTimer;
 -(void)stopBufferTimer;
@@ -48,6 +51,9 @@
     if(self == [super init])
     {
         _fileSaver = [[HTTPFileSaver alloc] initWithHTTPURL:URL localURL:nil delegate:self];
+#ifdef TARGET_OS_IPHONE
+        _backgroundTask = -1;
+#endif
     }
     return self;
 }
@@ -57,6 +63,9 @@
     if(self == [super init])
     {
         _fileSaver = [[HTTPFileSaver alloc] initWithHTTPURLs:URLs localURL:nil delegate:self];
+#ifdef TARGET_OS_IPHONE
+        _backgroundTask = -1;
+#endif
     }
     return self;
 }
@@ -89,7 +98,7 @@
             [_audioPlayer play];
         }
         
-        _buffering = false;
+        [self stopBuffering];
     }
     
     
@@ -163,7 +172,7 @@
                 NSLog(@"stopped download, shouldnt work");
             }
         }
-        _buffering = false;
+        [self stopBuffering];
         BOOL success = [_audioPlayer play];
         if(!success)
         {
@@ -173,12 +182,45 @@
     else
     {
         NSLog(@"Can't Play");
-        _buffering = true;
+        [self startBuffering];
         if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidStartBuffering:)])
         {
             [self.delegate audioPlayerDidStartBuffering:self];
         }
     }
+}
+
+-(void)startBuffering
+{
+    if(_buffering) return;
+    _buffering = true;
+#ifdef TARGET_OS_IPHONE
+    if(_backgroundTask != -1)
+    {
+        NSLog(@"Something went horribly wrong.");
+    }
+    _backgroundTask = [UIApplication.sharedApplication beginBackgroundTaskWithExpirationHandler:^{
+        [UIApplication.sharedApplication endBackgroundTask:_backgroundTask];
+        _backgroundTask = -1;
+    }];
+#endif
+}
+
+-(void)stopBuffering
+{
+    if(!_buffering) return;
+    _buffering = false;
+#ifdef TARGET_OS_IPHONE
+    if(_backgroundTask != -1)
+    {
+        [UIApplication.sharedApplication endBackgroundTask:_backgroundTask];
+        _backgroundTask = -1;
+    }
+    else
+    {
+        NSLog(@"Oh my god, something went horribly wrong.");
+    }
+#endif
 }
 
 -(void)pause
@@ -204,7 +246,7 @@
     if(!_fileSaver.downloaded)
     {
         NSLog(@"Ended and song isn't downloaded");
-        _buffering = true;
+        [self startBuffering];
         _songEndedStillBuffering = true;
         _lastCurrentTime = player.currentTime;
         _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:_fileSaver.localURL error:nil];
@@ -217,7 +259,7 @@
     }
     else
     {
-        _buffering = false;
+        [self stopBuffering];
         [self stopBufferTimer];
         if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidFinishPlaying:)])
         {
@@ -249,6 +291,7 @@
     [_fileSaver cancel];
     [_audioPlayer stop];
     _stopped = true;
+    [self stopBuffering];
     _audioPlayer.currentTime = 0;
 }
 
@@ -272,7 +315,7 @@
     if(!_buffering && _audioPlayer.playing && !self.canPlay)
     {
         [_audioPlayer pause];
-        _buffering = true;
+        [self startBuffering];
         if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidStartBuffering:)])
         {
             [self.delegate audioPlayerDidStartBuffering:self];
@@ -282,6 +325,7 @@
     {
         _songEndedStillBuffering = false;
         _audioPlayer.currentTime = _lastCurrentTime;
+        [self stopBuffering];
         [_audioPlayer play];
     }
     
