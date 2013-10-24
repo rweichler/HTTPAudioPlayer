@@ -29,6 +29,7 @@
 -(void)fileSaverCompleted:(HTTPFileSaver *)saver;
 -(void)fileSaverFailed:(HTTPFileSaver *)saver;
 -(void)fileSaverGotData:(HTTPFileSaver *)saver;
+-(void)fileSaverCancelled:(HTTPFileSaver *)saver;
 @end
 
 @interface HTTPFileSaver : NSObject<NSURLConnectionDelegate>

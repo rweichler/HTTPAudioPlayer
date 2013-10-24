@@ -40,6 +40,8 @@
     int _currentFileSizeBeforeFail;
     
     NSDictionary *_currentURLDict;
+    
+    BOOL _downloaded;
 }
 -(void)callDelegateSelector:(SEL)selector;
 
@@ -225,6 +227,8 @@
     
     dataAppendArray = nil;
     
+    [self callDelegateSelector:@selector(fileSaverCancelled:)];
+    
     return true;
 }
 
@@ -240,6 +244,15 @@
 
 -(void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
 {
+    if(_cancelled) return;
+    
+    if([(NSHTTPURLResponse *)response statusCode] != 200)
+    {
+        [self cancel];
+        [self callDelegateSelector:@selector(fileSaverFailed:)];
+        return;
+    }
+    
     if(!_downloading)
     {
         [[NSData data] writeToFile:_localURL.path options:NSDataWritingAtomic error:nil];
@@ -347,6 +360,8 @@
 
 -(BOOL)downloaded
 {
+    if(_downloaded) return true;
+    
     id obj = _currentURLDict;
     if(obj == nil) obj = _HTTPURL;
     return self.expectedSize != 0 && self.expectedSize == self.actualSize && (_HTTPURLs == nil || [_HTTPURLs indexOfObject:obj] == NSNotFound || [_HTTPURLs indexOfObject:obj] == _HTTPURLs.count - 1);
@@ -369,7 +384,6 @@
     _currentFileSizeBeforeFail = 0;
     if(_HTTPURLs != nil)
     {
-        NSLog(@"finished section");
         id obj;
         if(_currentURLDict != nil)
             obj = _currentURLDict;
@@ -396,6 +410,7 @@
                 _HTTPURL = [NSURL URLWithString:url];
             
             [self startIsInitial:false];
+            NSLog(@"finished section");
             return;
         }
         else if(index == _HTTPURLs.count - 1)
@@ -407,6 +422,7 @@
     }
     NSLog(@"finished download: %d %d", _actualSize, _expectedSize);
     _downloading = false;
+    _downloaded = true;
     [self callDelegateSelector:@selector(fileSaverCompleted:)];
 }
 
@@ -414,7 +430,8 @@
 {
     //let delegate know we failed and try again
     [self callDelegateSelector:@selector(fileSaverFailed:)];
-    _currentFileSizeBeforeFail = _currentFileSize;
+    if(_currentFileSizeBeforeFail < _currentFileSize)
+        _currentFileSizeBeforeFail = _currentFileSize;
     
     [self startIsInitial:false];
     

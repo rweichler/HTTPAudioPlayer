@@ -239,6 +239,11 @@
     return _audioPlayer.playing;
 }
 
+-(void)fileSaverCancelled:(HTTPFileSaver *)saver
+{
+    _justStartedDownload = false;
+}
+
 -(void)stop
 {
     [_fileSaver cancel];
