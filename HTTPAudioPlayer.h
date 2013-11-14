@@ -37,6 +37,7 @@
 -(void)audioPlayerDidFinishDownloading:(HTTPAudioPlayer *)audioPlayer;
 -(void)audioPlayerDownloadFailed:(HTTPAudioPlayer *)audioPlayer;
 -(void)audioPlayerGotData:(HTTPAudioPlayer *)audioPlayer;
+-(void)audioPlayer:(HTTPAudioPlayer *)audioPlayer failedWithStatusCode:(int)statusCode;
 
 @end
 

@@ -38,6 +38,7 @@
     
     int _currentFileSize;
     int _currentFileSizeBeforeFail;
+    int _currentExpectedFileSize;
     
     NSDictionary *_currentURLDict;
     
@@ -60,6 +61,8 @@
         _localURL = localURL;
         _delegate = delegate;
         
+        _currentFileSizeBeforeFail = 0;
+        
     }
     return self;
 }
@@ -71,6 +74,8 @@
         _HTTPURL = HTTPURL;
         _localURL = localURL;
         _delegate = delegate;
+        
+        _currentFileSizeBeforeFail = 0;
     }
     return self;
 }
@@ -111,21 +116,36 @@
     return [self startIsInitial:true];
 }
 
+-(BOOL)resume
+{
+    return [self startIsInitial:false];
+}
+
 -(void)setHTTPURLs:(NSArray *)HTTPURLs
 {
+    int index = 0;
+    if(_HTTPURLs != nil)
+    {
+        int findex = [_HTTPURLs indexOfObject:_HTTPURL];
+        if(findex != NSNotFound)
+            index = findex;
+    }
+    
+    NSLog(@"Setting HTTPURLS, first index is %d", index);
+    
     _HTTPURLs = HTTPURLs;
     
     if(_HTTPURLs == nil) return;
     
     id url;
-    if([HTTPURLs[0] isKindOfClass:NSDictionary.class])
+    if([HTTPURLs[index] isKindOfClass:NSDictionary.class])
     {
-        _currentURLDict = HTTPURLs[0];
+        _currentURLDict = HTTPURLs[index];
         url = _currentURLDict[@"url"];
     }
     else
     {
-        url = HTTPURLs[0];
+        url = HTTPURLs[index];
     }
     if([url isKindOfClass:NSURL.class])
         _HTTPURL = url;
@@ -133,8 +153,27 @@
         _HTTPURL = [NSURL URLWithString:url];
 }
 
+-(BOOL)fileExistsAtLocalURL
+{
+    if(self.localURL == nil) return false;
+    
+    BOOL result = [NSFileManager.defaultManager fileExistsAtPath:self.localURL.path];
+    if(result)
+    {
+        _downloading = false;
+        _downloaded = true;
+        _expectedSize = 300000;
+        _actualSize = self.expectedSize;
+        
+        [self callDelegateSelector:@selector(fileSaverCompleted:)];
+    }
+    return result;
+}
+
 -(BOOL)startIsInitial:(BOOL)initial
 {
+    if(initial && self.fileExistsAtLocalURL) return false;
+    
     if(_HTTPURL == nil || _localURL == nil || (initial && (self.downloading || self.downloaded))) return false;
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:_HTTPURL];
@@ -206,6 +245,25 @@
         }
     }
     
+    int start = [_currentURLDict[@"start"] intValue] + _currentFileSizeBeforeFail;
+    int end = [_currentURLDict[@"end"] intValue];
+    if(start || end)
+    {
+        NSString *endstr;
+        if(end == 0)
+        {
+            endstr = @"";
+        }
+        else
+        {
+            endstr = [NSString stringWithFormat:@"%d", end];
+        }
+        
+        NSString *val = [NSString stringWithFormat:@"bytes=%d-%@", start, endstr];
+        NSLog(@"Range: %@", val);
+        
+        [request addValue:val forHTTPHeaderField:@"Range"];
+    }
     
     _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
     if (!_connection) return false;
@@ -242,26 +300,57 @@
     return [manager removeItemAtURL:_localURL error:nil];
 }
 
+-(void)connectionFailedWithStatusCode:(int)statusCode
+{
+    
+    
+    [_connection cancel];
+    _currentFileSizeBeforeFail += _currentFileSize;
+    _expectedSize += _currentFileSize;
+    _currentFileSize = 0;
+    
+    
+    
+    if(statusCode == 0) //connection simply timed out
+    {
+        [self startIsInitial:false];
+    }
+    else //actual error
+    {
+        
+    }
+    
+    
+    if([self.delegate respondsToSelector:@selector(fileSaver:failedWithStatusCode:)])
+    {
+        [self.delegate fileSaver:self failedWithStatusCode:statusCode];
+    }
+    
+}
+
 -(void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
 {
     if(_cancelled) return;
     
-    if([(NSHTTPURLResponse *)response statusCode] != 200)
+    int statusCode = [(NSHTTPURLResponse *)response statusCode];
+    if(statusCode < 200 || statusCode > 299)
     {
-        [self cancel];
-        [self callDelegateSelector:@selector(fileSaverFailed:)];
+        NSLog(@"FAILURE: response statuscode is %d expected size is %d", statusCode, (int)response.expectedContentLength);
+        [self connectionFailedWithStatusCode:statusCode];
         return;
     }
+    
+    if(dataAppendArray == nil)
+        dataAppendArray = @[].mutableCopy;
     
     if(!_downloading)
     {
         [[NSData data] writeToFile:_localURL.path options:NSDataWritingAtomic error:nil];
-        dataAppendArray = @[].mutableCopy;
         _actualSize = 0;
         _expectedSize = 0;
         _downloading = true;
     }
-    _expectedSize += (int)response.expectedContentLength;
+    _currentExpectedFileSize = (int)response.expectedContentLength;
     [self callDelegateSelector:@selector(fileSaverStarted:)];
 }
 
@@ -269,7 +358,7 @@
 {
     int len = (int)data.length;
     int dataStart = 0, dataLen = len;
-    
+    /*
     if(_HTTPURLs != nil && _currentURLDict != nil && (_currentURLDict[@"start"] || _currentURLDict[@"end"]))
     {
         int start = [_currentURLDict[@"start"] intValue];
@@ -293,6 +382,8 @@
         if(dataLen < 0) dataLen = 0;
     }
     
+    _currentExpectedFileSize -= len - dataLen;
+    
     //if we previously failed the download, then don't redownload it
     int difference = _currentFileSizeBeforeFail - (_currentFileSize + dataStart);
     if(difference > 0)
@@ -310,9 +401,8 @@
     else if(dataLen == 0)
     {
         data = nil;
-    }
+    }*/
     
-    _expectedSize -= len - dataLen;
     _currentFileSize += len;
     
     if(data != nil)
@@ -358,6 +448,11 @@
     }
 }
 
+-(int)expectedSize
+{
+    return _expectedSize + _currentExpectedFileSize;
+}
+
 -(BOOL)downloaded
 {
     if(_downloaded) return true;
@@ -382,6 +477,8 @@
 {
     _currentFileSize = 0;
     _currentFileSizeBeforeFail = 0;
+    _expectedSize += _currentExpectedFileSize;
+    _currentExpectedFileSize = 0;
     if(_HTTPURLs != nil)
     {
         id obj;
@@ -420,7 +517,7 @@
             _HTTPURLs = nil;
         }
     }
-    NSLog(@"finished download: %d %d", _actualSize, _expectedSize);
+    NSLog(@"finished download: %d %d", _actualSize, self.expectedSize);
     _downloading = false;
     _downloaded = true;
     [self callDelegateSelector:@selector(fileSaverCompleted:)];
@@ -428,12 +525,9 @@
 
 -(void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
 {
-    //let delegate know we failed and try again
-    [self callDelegateSelector:@selector(fileSaverFailed:)];
-    if(_currentFileSizeBeforeFail < _currentFileSize)
-        _currentFileSizeBeforeFail = _currentFileSize;
+    NSLog(@"connection failed: %@", error);
     
-    [self startIsInitial:false];
+    [self connectionFailedWithStatusCode:0];
     
 }
 

@@ -30,6 +30,7 @@
 -(void)fileSaverFailed:(HTTPFileSaver *)saver;
 -(void)fileSaverGotData:(HTTPFileSaver *)saver;
 -(void)fileSaverCancelled:(HTTPFileSaver *)saver;
+-(void)fileSaver:(HTTPFileSaver *)saver failedWithStatusCode:(int)statusCode;
 @end
 
 @interface HTTPFileSaver : NSObject<NSURLConnectionDelegate>
@@ -59,7 +60,10 @@
 
 @property (nonatomic, strong) NSDictionary *properties;
 
+@property (nonatomic,readonly) BOOL fileExistsAtLocalURL;
+
 -(BOOL)start;
+-(BOOL)resume;
 -(BOOL)cancel;
 -(BOOL)deleteLocalFile;
 

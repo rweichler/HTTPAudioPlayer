@@ -32,6 +32,9 @@
     NSTimeInterval _lastCurrentTime;
     
     BOOL _stopped;
+    
+    BOOL _alreadyStopped;
+    
 #ifdef TARGET_OS_IPHONE
     int _backgroundTask;
 #endif
@@ -106,6 +109,16 @@
     {
         [self.delegate audioPlayerGotData:self];
     }
+    
+    /*
+    //test filesaver failure
+    if(saver.actualSize > 1000000 && !_alreadyStopped)
+    {
+        _alreadyStopped = true;
+        [self.fileSaver connection:nil didFailWithError:nil];
+    }
+    //*/
+    
 }
 -(void)setProperties:(NSDictionary *)properties
 {
@@ -122,6 +135,14 @@
 
 -(void)fileSaverCompleted:(HTTPFileSaver *)saver
 {
+    NSLog(@"file saver completed");
+    _justStartedDownload = false;
+    if(_audioPlayer == nil)
+    {
+        _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:_fileSaver.localURL error:nil];
+        _audioPlayer.delegate = self;
+        _stopped = true;
+    }
     if(self.delegate != nil && [self.delegate respondsToSelector:@selector(audioPlayerDidFinishDownloading:)])
     {
         [self.delegate audioPlayerDidFinishDownloading:self];
@@ -154,7 +175,7 @@
 -(void)play
 {
     if(_audioPlayer.playing) return;
-    
+    NSLog(@"play: %d, %d, %d, %d, %d, %d.", self.canPlay, _justStartedDownload, _fileSaver.expectedSize, _audioPlayer == nil, _fileSaver.downloaded, self.availableDuration - self.currentTime > HTTPAUDIOPLAYER_BUFFER_TIME);
     if(self.canPlay)
     {
         if(_stopped)
@@ -171,6 +192,7 @@
             {
                 NSLog(@"stopped download, shouldnt work");
             }
+            _stopped = false;
         }
         [self stopBuffering];
         BOOL success = [_audioPlayer play];
@@ -265,6 +287,14 @@
         {
             [self.delegate audioPlayerDidFinishPlaying:self];
         }
+    }
+}
+
+-(void)fileSaver:(HTTPFileSaver *)saver failedWithStatusCode:(int)statusCode
+{
+    if([self.delegate respondsToSelector:@selector(audioPlayer:failedWithStatusCode:)])
+    {
+        [self.delegate audioPlayer:self failedWithStatusCode:statusCode];
     }
 }
 
