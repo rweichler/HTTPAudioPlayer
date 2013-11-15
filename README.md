@@ -6,6 +6,7 @@ My implementation of an Audio streamer/player over HTTP. Uses AVFoundation's AVA
 It basically is an AVPlayer with a couple of nifty features, including: 
 
 * The ability to download the data before you play it
+* Saving the file to disk instead of keeping it in memory
 * Delegate methods for buffering
 * When the internet connection dies, it resumes the download when you get it again
 * Ability to set headers/cookies for files that require authorization
