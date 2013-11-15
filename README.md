@@ -3,7 +3,12 @@ HTTPAudioPlayer
 
 My implementation of an Audio streamer/player over HTTP. Uses AVFoundation's AVAudioPlayer and my own simple HTTPFileSaver to accomplish this.
 
-It basically is an AVPlayer with a couple of nifty features, including the ability to download the data before you play it and delegate methods for buffering.
+It basically is an AVPlayer with a couple of nifty features, including: 
+
+* The ability to download the data before you play it
+* Delegate methods for buffering
+* When the internet connection dies, it resumes the download when you get it again
+* Ability to set headers/cookies for files that require authorization
 
 # How to use
 
