@@ -43,9 +43,10 @@
     NSDictionary *_currentURLDict;
     
     BOOL _downloaded;
+    
+    int _currentURLIndex;
 }
 -(void)callDelegateSelector:(SEL)selector;
-
 @end
 
 @implementation HTTPFileSaver
@@ -62,6 +63,7 @@
         _delegate = delegate;
         
         _currentFileSizeBeforeFail = 0;
+        _currentURLIndex = 0;
         
     }
     return self;
@@ -76,6 +78,7 @@
         _delegate = delegate;
         
         _currentFileSizeBeforeFail = 0;
+        _currentURLIndex = 0;
     }
     return self;
 }
@@ -123,13 +126,7 @@
 
 -(void)setHTTPURLs:(NSArray *)HTTPURLs
 {
-    int index = 0;
-    if(_HTTPURLs != nil)
-    {
-        int findex = [_HTTPURLs indexOfObject:_HTTPURL];
-        if(findex != NSNotFound)
-            index = findex;
-    }
+    int index = _currentURLIndex;
     
     NSLog(@"Setting HTTPURLS, first index is %d", index);
     
@@ -153,21 +150,19 @@
         _HTTPURL = [NSURL URLWithString:url];
 }
 
+-(void)forceCompletion
+{
+    _downloading = false;
+    _downloaded = true;
+    _expectedSize = 300000;
+    _actualSize = self.expectedSize;
+    
+    [self callDelegateSelector:@selector(fileSaverCompleted:)];
+}
+
 -(BOOL)fileExistsAtLocalURL
 {
-    if(self.localURL == nil) return false;
-    
-    BOOL result = [NSFileManager.defaultManager fileExistsAtPath:self.localURL.path];
-    if(result)
-    {
-        _downloading = false;
-        _downloaded = true;
-        _expectedSize = 300000;
-        _actualSize = self.expectedSize;
-        
-        [self callDelegateSelector:@selector(fileSaverCompleted:)];
-    }
-    return result;
+    return self.localURL != nil && [NSFileManager.defaultManager fileExistsAtPath:self.localURL.path];
 }
 
 -(BOOL)startIsInitial:(BOOL)initial
@@ -175,6 +170,8 @@
     if(initial && self.fileExistsAtLocalURL) return false;
     
     if(_HTTPURL == nil || _localURL == nil || (initial && (self.downloading || self.downloaded))) return false;
+    
+    NSLog(@"Starting request with URL: %@", _HTTPURL);
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:_HTTPURL];
     if(self.properties[@"cookies"])
@@ -300,8 +297,10 @@
     return [manager removeItemAtURL:_localURL error:nil];
 }
 
--(void)connectionFailedWithStatusCode:(int)statusCode
+-(BOOL)pauseDownload
 {
+    if(self.pausedDownload) return false;
+    self.pausedDownload = true;
     
     
     [_connection cancel];
@@ -309,9 +308,13 @@
     _expectedSize += _currentFileSize;
     _currentFileSize = 0;
     
-    
-    
-    if(statusCode == 0) //connection simply timed out
+    return true;
+}
+
+-(void)connectionFailedWithStatusCode:(int)statusCode
+{
+    [self pauseDownload];
+    if(statusCode == 0) //connection simply timed out, try again
     {
         [self startIsInitial:false];
     }
@@ -330,15 +333,18 @@
 
 -(void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
 {
+    NSLog(@"GOT RESPONSE, expectedContentLength = %d", (int)response.expectedContentLength);
     if(_cancelled) return;
     
     int statusCode = [(NSHTTPURLResponse *)response statusCode];
     if(statusCode < 200 || statusCode > 299)
     {
-        NSLog(@"FAILURE: response statuscode is %d expected size is %d", statusCode, (int)response.expectedContentLength);
+        NSLog(@"FAILURE: response statuscode is %d", statusCode);
         [self connectionFailedWithStatusCode:statusCode];
         return;
     }
+    
+    self.pausedDownload = false;
     
     if(dataAppendArray == nil)
         dataAppendArray = @[].mutableCopy;
@@ -481,25 +487,19 @@
     _currentExpectedFileSize = 0;
     if(_HTTPURLs != nil)
     {
-        id obj;
-        if(_currentURLDict != nil)
-            obj = _currentURLDict;
-        else
-            obj = _HTTPURL;
-        NSUInteger index = [_HTTPURLs indexOfObject:obj];
-        if(index != NSNotFound && index < _HTTPURLs.count - 1)
+        _currentURLIndex++;
+        
+        if(_currentURLIndex < _HTTPURLs.count)
         {
-            index = index + 1;
-            
             id url;
-            if([_HTTPURLs[index] isKindOfClass:NSDictionary.class])
+            if([_HTTPURLs[_currentURLIndex] isKindOfClass:NSDictionary.class])
             {
-                _currentURLDict = _HTTPURLs[index];
+                _currentURLDict = _HTTPURLs[_currentURLIndex];
                 url = _currentURLDict[@"url"];
             }
             else
             {
-                url = _HTTPURLs[index];
+                url = _HTTPURLs[_currentURLIndex];
             }
             if([url isKindOfClass:NSURL.class])
                 _HTTPURL = url;
@@ -510,11 +510,12 @@
             NSLog(@"finished section");
             return;
         }
-        else if(index == _HTTPURLs.count - 1)
+        else
         {
             _HTTPURL = nil;
             _currentURLDict = nil;
             _HTTPURLs = nil;
+            _currentURLIndex = 0;
         }
     }
     NSLog(@"finished download: %d %d", _actualSize, self.expectedSize);
@@ -525,7 +526,7 @@
 
 -(void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
 {
-    NSLog(@"connection failed: %@", error);
+    //NSLog(@"connection failed, i.e. timed out");
     
     [self connectionFailedWithStatusCode:0];
     
@@ -538,7 +539,6 @@
         [self.delegate performSelector:selector withObject:self];
     }
 }
-
 
 @end
 //-------------------------------------------------------------------------

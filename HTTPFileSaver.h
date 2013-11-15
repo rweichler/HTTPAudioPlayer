@@ -62,8 +62,13 @@
 
 @property (nonatomic,readonly) BOOL fileExistsAtLocalURL;
 
+@property (nonatomic) BOOL pausedDownload;
+
+-(BOOL)pauseDownload;
+
 -(BOOL)start;
 -(BOOL)resume;
+-(void)forceCompletion;
 -(BOOL)cancel;
 -(BOOL)deleteLocalFile;
 
