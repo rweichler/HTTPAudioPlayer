@@ -1,3 +1,5 @@
+**NOTE**: Support for this has ended. If it breaks, you're on your own.
+
 HTTPAudioPlayer
 ========
 
